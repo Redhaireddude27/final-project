@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monkey Flappy Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background-color: rgb(77, 72, 71); /* Set the background of the page to black */
+            color: white; /* Set the text color to white */
+        }
+        h1 {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 36px;
+        }
+        canvas {
+            display: block;
+            margin: 20px auto; /* Center the canvas on the page with some margin */
+        }
+    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monkey Flappy Game</title>
+    <style>
+        body {
+            text-align: center; /* Centers all text inside the body */
+            font-family: Arial, sans-serif;
+            margin-bottom: 50px; /* Ensures space for the box at the bottom */
+        }
+        #gameCanvas {
+            display: block;
+            margin: 20px auto; /* Centers the canvas horizontally */
+        }
+        #gameContent {
+            margin-bottom: 50px; /* Adds space below the game content */
+        }
+        #footer {
+            background-color: #2b2828;
+            padding: 20px;
+            position: fixed;
+            left: 0;
+            bottom: 0;
+            width: 100%;
+            text-align: center;
+        }
+        #footer a {
+            text-decoration: none;
+            color: #007bff;
+            margin: 0 15px;
+        }
+        #footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <h1>Monkey Flappy Game</h1> <!-- Header above the game -->
+    <p>Jump through bananas and see how long you can survive!</p>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = 400;
+        canvas.height = 600;
+
+        const GRAVITY = 0.5;
+        const FLAP_STRENGTH = -10;
+        const BANANA_SPEED = 4;
+        const BANANA_GAP = 150;
+
+        // Load images
+        const monkeyImg = new Image();
+        monkeyImg.src = '../assets/img/monkey.png';
+
+        const backgroundImg = new Image();
+        backgroundImg.src = '../assets/img/background.jpg';
+
+        const bananaImg = new Image();  // Load the banana image
+        bananaImg.src = '../assets/img/banana.png';  // Path to the banana image
+
+        class Monkey {
+            constructor() {
+                this.x = 100;
+                this.y = canvas.height / 2;
+                this.width = 50;
+                this.height = 50;
+                this.velocity = 0;
+            }
+
+            flap() {
+                this.velocity = FLAP_STRENGTH;
+            }
+
+            update() {
+                this.velocity += GRAVITY;
+                this.y += this.velocity;
+                if (this.y + this.height > canvas.height) {
+                    this.y = canvas.height - this.height;
+                    this.velocity = 0;
+                }
+            }
+
+            draw() {
+                ctx.drawImage(monkeyImg, this.x, this.y, this.width, this.height);
+            }
+
+            getBounds() {
+                return { x: this.x, y: this.y, width: this.width, height: this.height };
+            }
+        }
+
+        class Banana {
+            constructor(x) {
+                this.x = x;
+                this.topHeight = Math.random() * (canvas.height - BANANA_GAP - 100) + 50;
+                this.bottomHeight = canvas.height - this.topHeight - BANANA_GAP;
+                this.width = 50;
+            }
+
+            update() {
+                this.x -= BANANA_SPEED;
+            }
+
+            draw() {
+                // Draw top banana using the banana image
+                ctx.drawImage(bananaImg, this.x, 0, this.width, this.topHeight);
+
+                // Draw bottom banana using the banana image
+                ctx.drawImage(bananaImg, this.x, canvas.height - this.bottomHeight, this.width, this.bottomHeight);
+            }
+
+            isOffScreen() {
+                return this.x + this.width < 0;
+            }
+
+            getBounds() {
+                return [
+                    { x: this.x, y: 0, width: this.width, height: this.topHeight },
+                    { x: this.x, y: canvas.height - this.bottomHeight, width: this.width, height: this.bottomHeight }
+                ];
+            }
+        }
+
+        function isCollision(rect1, rect2) {
+            return (
+                rect1.x < rect2.x + rect2.width &&
+                rect1.x + rect1.width > rect2.x &&
+                rect1.y < rect2.y + rect2.height &&
+                rect1.y + rect1.height > rect2.y
+            );
+        }
+
+        const monkey = new Monkey();
+        const bananas = [];
+        let frame = 0;
+        let score = 0;
+        let gameOver = false;
+
+        function resetGame() {
+            monkey.y = canvas.height / 2;
+            monkey.velocity = 0;
+            bananas.length = 0;
+            frame = 0;
+            score = 0;
+            gameOver = false;
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw background image
+            ctx.drawImage(backgroundImg, 0, 0, canvas.width, canvas.height);
+
+            if (!gameOver) {
+                // Update Monkey
+                monkey.update();
+
+                // Generate Bananas
+                if (frame % 120 === 0) {
+                    bananas.push(new Banana(canvas.width));
+                }
+
+                // Update Bananas
+                for (let i = bananas.length - 1; i >= 0; i--) {
+                    bananas[i].update();
+                    bananas[i].draw();
+
+                    // Check collision
+                    const bounds = monkey.getBounds();
+                    for (const bananaBound of bananas[i].getBounds()) {
+                        if (isCollision(bounds, bananaBound)) {
+                            gameOver = true;
+                        }
+                    }
+
+                    if (bananas[i].isOffScreen()) {
+                        bananas.splice(i, 1);
+                        score++;
+                    }
+                }
+
+                // Draw Monkey
+                monkey.draw();
+
+                // Draw Score
+                ctx.fillStyle = '#FFF';  // White color for text
+                ctx.font = '20px Arial';
+                ctx.fillText(`Score: ${score}`, 10, 30);
+            } else {
+                ctx.fillStyle = '#FFF';  // White color for text
+                ctx.font = '30px Arial';
+                ctx.fillText('Game Over!', canvas.width / 2 - 75, canvas.height / 2);
+                ctx.font = '20px Arial';
+                ctx.fillText('Press R to Restart', canvas.width / 2 - 85, canvas.height / 2 + 40);
+            }
+
+            frame++;
+            requestAnimationFrame(gameLoop);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !gameOver) {
+                monkey.flap();
+            } else if (e.code === 'KeyR' && gameOver) {
+                resetGame();
+            }
+        });
+
+        gameLoop();
+    </script>
+    <br>
+    <div id="footer">
+        <a href="../index.html">Back to Resume</a>
+        <a href="../html/scratch.html">Go to Hungary Travel Page</a>
+    </div>
+</body>
+</html>
